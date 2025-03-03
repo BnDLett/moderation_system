@@ -235,7 +235,7 @@ public class Main extends Plugin {
                 return;
             }
 
-            player.sendMessage(pluginMessageName + "[scarlet]WARNING[gray]:[white] " + reason);
+            playerToWarn.sendMessage(pluginMessageName + "[scarlet]WARNING[gray]:[white] " + reason);
         });
 
         handler.<Player>register("info", "<username...>", "Get the info of a player.", (args, player) -> {
@@ -346,6 +346,43 @@ public class Main extends Plugin {
             } catch (SQLException e) {
                 player.sendMessage(pluginMessageName + "An error occurred when trying to process your request.");
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
+            }
+        });
+
+        handler.<Player>register("hide-staff-tag", "Hides your staff/admin tag. If you run this when your" +
+                "staff/admin tag is hidden, then it will show the staff/admin tag again.", (args, player) -> {
+            try {
+                if (!checkPermission(false, player.uuid())) {
+                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                    return;
+                }
+            } catch (SQLException e) {
+                System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+                return;
+            }
+
+            if (player.plainName().startsWith("(Admin)") || player.plainName().startsWith("(Staff)")) {
+                // [#c6633e]([scarlet]Admin[#c6633e])[] Lett
+                // ------------------------------------ 0
+
+                // this codebase lowkey kind of sucks, so I'm not going to try more than I need to.
+                if (player.name().contains("Admin")) {
+                    player.name(player.name().split("\\[#c6633e]\\(\\[scarlet]Admin\\[#c6633e]\\)\\[] ")[1]);
+                    return;
+                }
+
+                player.name(player.name().split("\\[#c6633e]\\(\\[scarlet]Staff\\[#c6633e]\\)\\[] ")[1]);
+                return;
+            }
+
+            try {
+                if (checkPermission(true, player.uuid())) {
+                    player.name(String.format("[#c6633e]([scarlet]Admin[#c6633e])[] %s", player.name()));
+                } else {
+                    player.name(String.format("[#c6633e]([scarlet]Staff[#c6633e])[] %s", player.name()));
+                }
+            } catch (SQLException e) {
+                System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             }
         });
     }
