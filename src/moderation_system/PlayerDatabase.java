@@ -259,6 +259,20 @@ public class PlayerDatabase {
         statement.close();
     }
 
+    /**
+     * Gets all staff from the database.
+     * @return A ResultSet containing all of the staff.
+     * @throws SQLException An exception that is thrown by SQL.
+     */
+    public ResultSet getAllStaff() throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement("""
+                SELECT *
+                FROM staff;
+                """);
+
+        return statement.executeQuery();
+    }
+
 
     /**
      * Gets the start of a ban by UUID.
@@ -366,12 +380,11 @@ public class PlayerDatabase {
             generateNewBanID = false;
         }
 
-        System.out.println(hexBanID);
         statement.setString(1,UUID);
         statement.setString(2,hexBanID);
         statement.setString(3,banReason);
         statement.setLong(4,currentTime);
-        statement.setString(5,endTime);
+        statement.setLong(5, Long.parseLong(endTime));
         statement.setString(6,staffID);
         statement.executeUpdate();
         statement.close();
@@ -402,5 +415,47 @@ public class PlayerDatabase {
         statement.setString(1,UUID);
         statement.executeUpdate();
         statement.close();
+    }
+
+    /**
+     * Transfers a ban from one staff member to another.
+     * @param oldID The ID of the staff member that currently has the bans.
+     * @param newID The ID of the staff member to gain responsibility of the bans.
+     * @throws SQLException An exception thrown by SQL.
+     */
+    public void transferBan(String oldID, String newID) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement("""
+                        UPDATE banned_players
+                        SET discord_id=?
+                        WHERE discord_id=?;
+                        """);
+
+        statement.setString(1, newID);
+        statement.setString(2, oldID);
+
+        statement.executeUpdate();
+        statement.close();
+    }
+
+    /**
+     * Gets the bans from a given staff ID.
+     * @param staffID The Discord ID (or the ID used in the database) of the staff.
+     * @return A SQL ResultSet containing the bans.
+     * @throws SQLException An exception thrown from SQL.
+     */
+    public ResultSet getBans(String staffID) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                        """
+                       SELECT *
+                       FROM banned_players
+                       WHERE discord_id=?;
+                       """
+        );
+
+        statement.setString(1, staffID);
+        // I don't close the statement because SQLite doesn't like that for some reason.
+        // (fuck you sqlite)
+
+        return statement.executeQuery();
     }
 }

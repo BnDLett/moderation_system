@@ -8,10 +8,13 @@ import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.mod.Plugin;
 import mindustry.net.Administration;
+
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import static java.lang.Integer.parseInt;
+import static mindustry.Vars.netServer;
 
 public class Main extends Plugin {
     public final String pluginMessageName = "[gray]<[#003ec8]Moderation[gray]>[white] ";
@@ -89,9 +92,7 @@ public class Main extends Plugin {
             }
         });
 
-        Events.on(EventType.PlayerLeave.class, event -> {
-            playerIdentifiers.remove(event.player.uuid());
-        });
+        Events.on(EventType.PlayerLeave.class, event -> playerIdentifiers.remove(event.player.uuid()));
 
         Events.on(EventType.PlayerConnect.class, event -> {
             boolean banned;
@@ -113,31 +114,14 @@ public class Main extends Plugin {
             if (banned) {
                 String banReason;
                 String banID;
-
-                long currentTime;
                 long banEnd;
-                long banDuration;
-
-                long durationHours;
-                long durationDays;
-                long durationMinutes;
-                long durationSeconds;
-
-                Duration duration;
+                Date banEndDate;
 
                 try {
                     banReason = database.getBanReason(event.player.uuid());
                     banID = database.getBanID(event.player.uuid());
-                    currentTime = System.currentTimeMillis();
                     banEnd = database.getBanEndTime(event.player.uuid());
-
-                    banDuration = banEnd - currentTime;
-                    duration = Duration.ofMillis(banDuration);
-
-                    durationSeconds = duration.getSeconds() % 60;
-                    durationMinutes = duration.toMinutes() % 60;
-                    durationHours = duration.toHours() % 60;
-                    durationDays = duration.toDays() % 24;
+                    banEndDate = Date.from(Instant.ofEpochMilli(banEnd));
                 } catch (SQLException e) {
                     throw new RuntimeException(e);
                 }
@@ -146,10 +130,9 @@ public class Main extends Plugin {
                         [scarlet]You are banned from this server.
                         
                         [orange]Reason[gray]:[white] %s
-                        [orange]Time remaining[gray]:[white] %d days %d hours %d minutes %d seconds
+                        [orange]Ban ends[gray]:[white] %s
                         
-                        [orange]Ban ID[gray]:[white] %s""", banReason, durationDays, durationHours, durationMinutes,
-                        durationSeconds, banID
+                        [orange]Ban ID[gray]:[white] %s""", banReason, banEndDate, banID
                 );
                 event.player.kick(banMessage, 0);
             }
@@ -280,7 +263,8 @@ public class Main extends Plugin {
             long duration = parseInt(args[1]);
             String reason = args[2];
 
-            long durationMillis = duration * 86400000;
+            // days * hours_in_day * minutes_in_hour * seconds_in_minute * millis_in_seconds
+            long durationMillis = duration * (24 * 60 * 60) * 1000;
 
             long currentTime = System.currentTimeMillis();
             long endTime = currentTime + durationMillis;
@@ -404,6 +388,7 @@ public class Main extends Plugin {
             } catch (SQLException e) {
                 Log.err("An error occurred when trying to process your request.");
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
             }
 
             Log.info("Staff added.");
@@ -417,9 +402,103 @@ public class Main extends Plugin {
             } catch (SQLException e) {
                 Log.err("An error occurred when trying to process your request.");
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
             }
 
             Log.info("Staff removed.");
+        });
+
+        handler.register("transfer-bans", "<initial-id> <new-id>", "Transfers the bans from an initial" +
+                "ID to a new ID.", args -> {
+            String initialID = args[0];
+            String newID = args[1];
+
+            try {
+                database.transferBan(initialID, newID);
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
+            }
+
+            Log.info("Ban transfer successful.");
+        });
+
+        handler.register("get-staff-bans", "<staff-discord-id>", "Gets the bans of a staff member " +
+                "based on their Discord ID.", args -> {
+            String discordID = args[0];
+            ResultSet results;
+
+            try {
+                results = database.getBans(discordID);
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
+            }
+
+            try {
+                while (results.next()) {
+                    long banStart = results.getLong("ban_start");
+                    long banEnd = results.getLong("ban_end");
+                    Date banStartDate = Date.from(Instant.ofEpochMilli(banStart));
+                    Date banEndDate = Date.from(Instant.ofEpochMilli(banEnd));
+
+                    System.out.printf(
+                            """
+                                    ========================================
+                                    %s
+                                    - WHEN:     %s
+                                    - UNTIL:    %s
+                                    - WHY:      %s
+                                    - WHO:      %s
+                                    - STAFF ID: %s
+                                    ========================================
+                                    
+                                    """,
+                            results.getString("ban_id"),
+                            banStartDate,
+                            banEndDate,
+                            results.getString("ban_reason"),
+                            results.getString("uuid"),
+                            results.getString("discord_id")
+                    );
+                }
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+            }
+        });
+
+        handler.register("get-all-staff", "Gets all staff from the database.", args -> {
+            try {
+                ResultSet results = database.getAllStaff();
+
+                while (results.next()) {
+                    String uuid = results.getString("uuid");
+                    Administration.PlayerInfo player = netServer.admins.getInfoOptional(uuid);
+
+                    System.out.printf("""
+                            ========================================
+                            %s
+                            - UUID:                  %s
+                            - Admin:                 %b
+                            - Previous known name:   %s
+                            - Colored previous name: %s
+                            ========================================
+                            
+                            """,
+                            results.getString("discord_id"),
+                            results.getString("uuid"),
+                            results.getBoolean("admin"),
+                            player.plainLastName(),
+                            player.lastName
+                            );
+                }
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+            }
         });
     }
 }
