@@ -138,23 +138,6 @@ public class Main extends Plugin {
             }
         });
 
-//        Vars.netServer.admins.addChatFilter((player, text) -> {
-//            try {
-//                if (checkPermission(true, player.uuid())) {
-//                    return String.format("[scarlet][Admin][] [%s] %s", player.coloredName(), text);
-//                }
-//                else if (checkPermission(false, player.uuid())) {
-//                    return String.format("[scarlet][Staff][] [%s] %s", player.coloredName(), text);
-//                }
-//                else {
-//                    return String.format("[%s] %s", player.coloredName(), text);
-//                }
-//            } catch (SQLException e) {
-//                Log.err(e);
-//                return "";
-//            }
-//        });
-
         Events.on(EventType.PlayerJoin.class, event -> {
             try {
                 if (checkPermission(true, event.player.uuid())) {
@@ -167,6 +150,48 @@ public class Main extends Plugin {
                 Log.err(e);
             }
         });
+    }
+
+    private void banCommand(Player player, String reason, Long endTime, Administration.PlayerInfo playerToBan) {
+        try {
+            if (!checkPermission(true, player.uuid())) {
+                player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                return;
+            }
+        } catch (SQLException e) {
+            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+            return;
+        }
+
+        String staffID;
+        try {
+            staffID = database.getStaffID(player.uuid());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            database.addBan(playerToBan.id, reason, String.valueOf(endTime), staffID);
+            String banID = database.getBanID(playerToBan.id);
+
+            String banMessage = String.format("""
+                        [scarlet]You are banned from this server.
+                        [orange]Reason[gray]:[white] %s
+                        
+                        [orange]Ban ID[gray]:[white] %s""", reason, banID
+            );
+
+            Player playerToKick = Groups.player.find(p -> p.uuid().equals(playerToBan.id));
+
+            if (playerToKick == null) {
+                Log.warn("Not kicking " + playerToBan.id + " -- could not find player in the server.");
+                return;
+            }
+
+            playerToKick.kick(banMessage, 0);
+        } catch (SQLException e) {
+            player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
+        }
     }
 
     @Override
@@ -269,45 +294,33 @@ public class Main extends Plugin {
             long currentTime = System.currentTimeMillis();
             long endTime = currentTime + durationMillis;
 
-            try {
-                if (!checkPermission(true, player.uuid())) {
-                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
-                    return;
-                }
-            } catch (SQLException e) {
-                System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-                return;
-            }
-
-            String staffID;
-            try {
-                staffID = database.getStaffID(player.uuid());
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-
             String playerUUID = getKeyByValue(playerIdentifiers, id);
-            Player playerToBan = Groups.player.find(p -> p.uuid().equals(playerUUID));
+            Administration.PlayerInfo playerToBan = netServer.admins.getInfo(playerUUID);
 
             if (playerToBan == null) {
                 player.sendMessage(pluginMessageName + "[scarlet]Could not find a player by that ID.");
                 return;
             }
 
-            try {
-                database.addBan(playerUUID, reason, String.valueOf(endTime), staffID);
-                String banID = database.getBanID(playerUUID);
+            banCommand(player, reason, endTime, playerToBan);
+        });
 
-                String banMessage = String.format("""
-                        [scarlet]You are banned from this server.
-                        [orange]Reason[gray]:[white] %s
-                        
-                        [orange]Ban ID[gray]:[white] %s""", reason, banID
-                );
-                playerToBan.kick(banMessage, 0);
-            } catch (SQLException e) {
-                player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
-            }
+        handler.<Player>register("ban-by-uuid", "<uuid> <days> <reason...>", "Bans a player with " +
+                "their UUID. Keep in mind that this will NOT work if the player has never joined the server before.",
+                (args, player) -> {
+            String playerUUID = args[0];
+            long duration = parseInt(args[1]);
+            String reason = args[2];
+
+            // days * hours_in_day * minutes_in_hour * seconds_in_minute * millis_in_seconds
+            long durationMillis = duration * (24 * 60 * 60) * 1000;
+
+            long currentTime = System.currentTimeMillis();
+            long endTime = currentTime + durationMillis;
+
+            Administration.PlayerInfo playerToBan = netServer.admins.getInfo(playerUUID);
+
+            banCommand(player, reason, endTime, playerToBan);
         });
 
         handler.<Player>register("unban", "<id>", "Unbans a player.", (args, player) -> {
