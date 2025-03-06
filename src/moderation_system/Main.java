@@ -73,6 +73,8 @@ public class Main extends Plugin {
             databaseNotConfiguredWarning();
         }
 
+        // Looking at this in 3/6/2025, I genuinely do not know what I was doing with this.
+        // The code I wrote on 8/25/24 clearly was NOT the best.
         if (!databaseConfigured) {
             databaseConfigured = true;
             setupDatabase();
@@ -189,6 +191,8 @@ public class Main extends Plugin {
             }
 
             playerToKick.kick(banMessage, 0);
+            player.sendMessage(String.format("%s The player has been banned. Ban ID: [gold]%s[]", pluginMessageName,
+                    banID));
         } catch (SQLException e) {
             player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
         }
@@ -219,6 +223,7 @@ public class Main extends Plugin {
             }
 
             playerToKick.kick(reason);
+            player.sendMessage(pluginMessageName + "The player has been [scarlet]kicked[].");
         });
 
         handler.<Player>register("warn", "<id> <reason...>", "Warn a player.", (args, player) -> {
@@ -244,6 +249,8 @@ public class Main extends Plugin {
             }
 
             playerToWarn.sendMessage(pluginMessageName + "[scarlet]WARNING[gray]:[white] " + reason);
+            // I feel like the orange color will make it ominous and, therefore, hilarious.
+            player.sendMessage(pluginMessageName + "The specified player has been [orange]warned[].");
         });
 
         handler.<Player>register("info", "<username...>", "Get the info of a player.", (args, player) -> {
