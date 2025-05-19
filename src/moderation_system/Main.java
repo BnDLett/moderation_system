@@ -4,6 +4,7 @@ import arc.Events;
 import arc.util.CommandHandler;
 import arc.util.Log;
 import mindustry.game.EventType;
+import mindustry.gen.Call;
 import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.mod.Plugin;
@@ -183,6 +184,9 @@ public class Main extends Plugin {
                         [orange]Ban ID[gray]:[white] %s""", reason, banID
             );
 
+            player.sendMessage(String.format("%s The player has been banned. Ban ID: [gold]%s[]", pluginMessageName,
+                    banID));
+
             Player playerToKick = Groups.player.find(p -> p.uuid().equals(playerToBan.id));
 
             if (playerToKick == null) {
@@ -191,8 +195,6 @@ public class Main extends Plugin {
             }
 
             playerToKick.kick(banMessage, 0);
-            player.sendMessage(String.format("%s The player has been banned. Ban ID: [gold]%s[]", pluginMessageName,
-                    banID));
         } catch (SQLException e) {
             player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
         }
@@ -389,6 +391,10 @@ public class Main extends Plugin {
                 System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             }
         });
+
+        handler.register("report", "Provides a URL to a tally form that allows you to report a player.",
+                (String[] args, Player player) ->
+                        Call.openURI(String.format("https://tally.so/r/wLyXDy?report_id=%s", player.uuid())));
     }
 
     @Override
