@@ -3,5 +3,5 @@
   "author": "BnDLett",
   "main": "moderation_system.Main",
   "description": "A moderation plugin.",
-  "version": "0.9.0"
+  "version": "0.9.1"
 }

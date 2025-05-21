@@ -394,7 +394,8 @@ public class Main extends Plugin {
 
         handler.register("report", "Provides a URL to a tally form that allows you to report a player.",
                 (String[] args, Player player) ->
-                        Call.openURI(String.format("https://tally.so/r/wLyXDy?report_id=%s", player.uuid())));
+                        Call.openURI(player.con(), String.format("https://tally.so/r/wLyXDy?report_id=%s",
+                                player.uuid())));
     }
 
     @Override
