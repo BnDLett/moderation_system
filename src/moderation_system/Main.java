@@ -24,6 +24,7 @@ public class Main extends Plugin {
     private boolean databaseConfigured;
     private PlayerDatabase database;
     public static Administration.Config databaseLocation;
+    public static Administration.Config reportFormURL;
 
     /**
      * @param adminLevel whether to only allow up to admin level.
@@ -69,6 +70,9 @@ public class Main extends Plugin {
     public void init(){
         databaseLocation = new Administration.Config("db-location",
                 "The location of the MDN Moderation database.", "");
+
+        reportFormURL = new Administration.Config("report-form-url", "The URL for the report form.",
+                "");
 
         if (databaseLocation.string().isEmpty()) {
             databaseNotConfiguredWarning();
@@ -393,9 +397,15 @@ public class Main extends Plugin {
         });
 
         handler.register("report", "Provides a URL to a tally form that allows you to report a player.",
-                (String[] args, Player player) ->
-                        Call.openURI(player.con(), String.format("https://tally.so/r/wLyXDy?report_id=%s",
-                                player.uuid())));
+                (String[] args, Player player) -> {
+            if (reportFormURL.string().isEmpty()) {
+                Log.warn("Couldn't run report command. No URL provided.");
+                player.sendMessage("[scarlet]Couldn't run the report command. No URL is configured.");
+                return;
+            }
+
+            Call.openURI(player.con(), String.format("%s?report_id=%s", reportFormURL.string(), player.uuid()));
+        });
     }
 
     @Override
