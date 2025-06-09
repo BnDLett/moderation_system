@@ -408,7 +408,7 @@ public class Main extends Plugin {
             Call.openURI(player.con(), String.format("%s?report_id=%s", reportFormURL.string(), player.uuid()));
         });
 
-        handler.<Player>register("kill", "[name]", "Kills a player.", (args, player) -> {
+        handler.<Player>register("kill", "[name...]", "Kills a player.", (args, player) -> {
             Player target = player;
 
             if (args.length == 1) {
