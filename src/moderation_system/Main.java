@@ -3,6 +3,7 @@ package moderation_system;
 import arc.Events;
 import arc.util.CommandHandler;
 import arc.util.Log;
+import mindustry.content.UnitTypes;
 import mindustry.game.EventType;
 import mindustry.gen.Call;
 import mindustry.gen.Groups;
@@ -16,6 +17,8 @@ import java.time.Instant;
 import java.util.*;
 import static java.lang.Integer.parseInt;
 import static mindustry.Vars.netServer;
+import static mindustry.content.Blocks.distributor;
+import static mindustry.content.Blocks.router;
 
 public class Main extends Plugin {
     public final String pluginMessageName = "[gray]<[#003ec8]Moderation[gray]>[white] ";
@@ -406,7 +409,40 @@ public class Main extends Plugin {
 
             Call.openURI(player.con(), String.format("%s?report_id=%s", reportFormURL.string(), player.uuid()));
         });
+
+        handler.<Player>register("kill", "[name]", "Kills a player.", (args, player) -> {
+            Player target = player;
+            if (args.length == 1) {
+            try {
+                if (!checkPermission(false, player.uuid())) {
+                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                    return;
+                }
+
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return;
+            }
+            String targetName = args[0];
+                target = Groups.player.find(p -> p.name().equals(targetName));
+                if (target == null) {
+                    player.sendMessage(pluginMessageName + "The chosen player doesn't exist.");
+                    return;
+                }
+        }
+
+            if (target.unit().type() == UnitTypes.block) {
+                player.sendMessage(pluginMessageName + "The chosen player is in a block, and as a result cannot be killed.");
+                return;
+            }
+
+            target.unit().kill();
+            player.sendMessage(pluginMessageName + "I think he had a heart attack.");
+
+
+        });
     }
+
 
     @Override
     public void registerServerCommands(CommandHandler handler) {
