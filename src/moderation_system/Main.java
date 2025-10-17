@@ -1,8 +1,10 @@
 package moderation_system;
 
 import arc.Events;
+import arc.struct.ObjectSet;
 import arc.util.CommandHandler;
 import arc.util.Log;
+import mindustry.Vars;
 import mindustry.content.UnitTypes;
 import mindustry.game.EventType;
 import mindustry.gen.Call;
@@ -10,10 +12,15 @@ import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.mod.Plugin;
 import mindustry.net.Administration;
+import mindustry.world.Tile;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.*;
 import static java.lang.Integer.parseInt;
 import static mindustry.Vars.netServer;
@@ -203,6 +210,21 @@ public class Main extends Plugin {
         } catch (SQLException e) {
             player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
         }
+    }
+
+    private void displayInfo(Player sender, Administration.PlayerInfo info) {
+        LocalDateTime lastKicked = LocalDateTime.ofInstant(Instant.ofEpochSecond(info.lastKicked), ZoneId.systemDefault());
+        String lastKickedFormatted = lastKicked.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String tz = ZoneId.systemDefault().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+
+        if (info.lastKicked == 0) {
+            lastKickedFormatted = "no kicks found or was pardoned.";
+            tz = "";
+        }
+
+        String toSend = String.format("Username: %s[white]\nIP: %s\nLast kicked: %s %s", info.lastName, info.lastIP,
+                lastKickedFormatted, tz);
+        sender.sendMessage(toSend);
     }
 
     @Override
@@ -438,6 +460,65 @@ public class Main extends Plugin {
 
             target.unit().kill();
             player.sendMessage(pluginMessageName + "I think he had a heart attack.");
+        });
+
+        handler.<Player>register("build-info", "[x] [y]", "Build information for a block.", (args, player) -> {
+            Tile targetTile = player.tileOn();
+
+            if (args.length == 1) {
+                player.sendMessage("Got x value but not y.");
+                return;
+            } else if (args.length == 2) {
+                try {
+                    int x = Integer.parseInt(args[0]);
+                    int y = Integer.parseInt(args[1]);
+                    targetTile = Vars.world.tile(x, y);
+                } catch (NumberFormatException e) {
+                    player.sendMessage("Invalid coordinates!");
+                    return;
+                }
+            }
+
+            if (targetTile.build == null) {
+                player.sendMessage("Couldn't trace the specified block.");
+                return;
+            }
+
+            String lastAccessed = targetTile.build.lastAccessed();
+            String coordinates = String.format("(%d, %d)", targetTile.x, targetTile.y);
+            String toSend = String.format("Last accessed by: %s[white]\nBlock coordinates: %s", lastAccessed, coordinates);
+            player.sendMessage(toSend);
+        });
+
+        handler.<Player>register("lookup", "<username/uuid> <term...>", "Looks up offline players.", (args, player) -> {
+            String mode = args[0];
+            String term = args[1];
+
+            try {
+                if (!checkPermission(true, player.uuid())) {
+                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                    return;
+                }
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return;
+            }
+
+            if (mode.equals("uuid")) {
+                Administration.PlayerInfo info = netServer.admins.getInfoOptional(term);
+                if (info == null) { player.sendMessage("Couldn't find that UUID."); return;}
+                if (info.admin) { player.sendMessage("Friendly fire is not allowed!"); return;}
+                displayInfo(player, info);
+                return;
+            }
+
+            ObjectSet<Administration.PlayerInfo> infoSet = netServer.admins.findByName(term);
+
+            for (Administration.PlayerInfo info : infoSet) {
+                if (info == null) { player.sendMessage("Couldn't find that UUID."); return;}
+                if (info.admin) { player.sendMessage("Friendly fire is not allowed!"); return;}
+                displayInfo(player, info);
+            }
         });
     }
 
