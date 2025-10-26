@@ -574,6 +574,7 @@ public class Main extends Plugin {
             }
 
             target.name(newName);
+            player.sendMessage("Username updated.");
         });
     }
 
@@ -776,6 +777,7 @@ public class Main extends Plugin {
             }
 
             player.name(newName);
+            Log.info("Username updated to @.", newName);
         });
     }
 }
