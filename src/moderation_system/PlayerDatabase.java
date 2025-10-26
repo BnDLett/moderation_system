@@ -58,6 +58,16 @@ public class PlayerDatabase {
                 ");"
         );
 
+        statement.executeUpdate("CREATE TABLE IF NOT EXISTS shadow_ban (" +
+                "id          INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "uuid        TEXT               NOT NULL, " +
+                "ban_reason  TEXT               NOT NULL, " +
+                "ban_start   INT                NOT NULL, " +
+                "ban_end     INT                NOT NULL, " +
+                "FOREIGN KEY (uuid)       REFERENCES players(uuid)" +
+                ");"
+        );
+
 
         statement.close();
     }
@@ -457,5 +467,101 @@ public class PlayerDatabase {
         // (fuck you sqlite)
 
         return statement.executeQuery();
+    }
+
+    // not yet necessary?
+//    public ResultSet getShadowBans(String staffID) throws SQLException {
+//        PreparedStatement statement = this.databaseConnection.prepareStatement(
+//                """
+//               SELECT *
+//               FROM banned_players
+//               WHERE discord_id=?;
+//               """
+//        );
+//
+//        statement.setString(1, staffID);
+//        // I don't close the statement because SQLite doesn't like that for some reason.
+//        // (fuck you sqlite)
+//
+//        return statement.executeQuery();
+//    }
+
+    public long getShadowBanEnd(String UUID) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "SELECT * FROM shadow_ban WHERE uuid = ?;"
+        );
+        statement.setString(1,UUID);
+        ResultSet databaseResult = statement.executeQuery();
+
+        long banEndTime = 0;
+
+        if (databaseResult.next()) {
+            banEndTime = databaseResult.getLong("ban_end");
+        }
+        statement.close();
+        databaseResult.close();
+
+        return banEndTime;
+    }
+
+    public boolean checkShadowBan(String UUID) throws SQLException {
+        long currentTime = System.currentTimeMillis();
+        long banEndTime = this.getShadowBanEnd(UUID);
+        boolean banIsValid = currentTime <= banEndTime;
+
+        if (!banIsValid) {
+            this.removeShadowBan(UUID);
+        }
+
+        return banIsValid;
+    }
+
+    public void addShadowBan(String UUID, String banReason, String endTime) throws SQLException {
+        long currentTime = System.currentTimeMillis();
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "INSERT INTO shadow_ban (uuid, ban_reason, ban_start, ban_end) VALUES (?, ?, " +
+                        "?, ?);"
+        );
+
+        statement.setString(1, UUID);
+        statement.setString(2, banReason);
+        statement.setLong(3, currentTime);
+        statement.setLong(4, Long.parseLong(endTime));
+        statement.executeUpdate();
+        statement.close();
+    }
+
+    public void removeShadowBanFromID(String id) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "DELETE FROM shadow_ban WHERE id==?;"
+        );
+        statement.setString(1, id);
+        statement.executeUpdate();
+        statement.close();
+    }
+
+    public void removeShadowBan(String uuid) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "DELETE FROM shadow_ban WHERE uuid==?;"
+        );
+        statement.setString(1, uuid);
+        statement.executeUpdate();
+        statement.close();
+    }
+
+    public String lookupShadowBanId(String uuid) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "SELECT * FROM shadow_ban WHERE uuid = ?;"
+        );
+        statement.setString(1, uuid);
+        ResultSet databaseResult = statement.executeQuery();
+
+        String id = null;
+
+        if (databaseResult.next()) {
+            id = databaseResult.getString("id");
+        }
+
+        return id;
     }
 }
