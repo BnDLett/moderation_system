@@ -93,6 +93,38 @@ public class Main extends Plugin {
             setupDatabase();
         }
 
+        netServer.admins.addActionFilter(action -> {
+            try {
+                if (database.checkShadowBan(action.player.uuid())) {
+//                    action.player.sendMessage("[scarlet]Unable to authorize action.");
+                    return false;
+                }
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return true;
+            }
+
+            return true;
+        });
+
+        netServer.admins.addChatFilter((player, message) -> {
+            try {
+                if (database.checkShadowBan(player.uuid())) {
+                    String usernameFormat = String.format("[accent][[%s[accent]]:[white] ", player.coloredName());
+                    player.sendMessage(usernameFormat + message, player, message);
+                    // based on anuke's code
+                    // https://github.com/Anuken/Mindustry/blob/09783898aadd79da52689a8f94543af6dae9d0e7/core/src/mindustry/core/NetClient.java#L300
+                    Log.info("&fi@ (shadow banned): @", "&lc" + player.plainName(), "&lw" + message);
+                    return null;
+                }
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return message;
+            }
+
+            return message;
+        });
+
         Events.on(EventType.PlayerJoin.class, event -> {
             long newPlayerID = randomGenerator.nextInt() + (1L << 31);
             String hexPlayerID = Long.toHexString(newPlayerID);
@@ -520,6 +552,30 @@ public class Main extends Plugin {
                 displayInfo(player, info);
             }
         });
+
+        handler.<Player>register("change-username", "<uuid> <new-name...>", "Changes the username of a player.", (args, player) -> {
+            String uuid = args[0];
+            String newName = args[1];
+
+            try {
+                if (!checkPermission(true, player.uuid())) {
+                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                    return;
+                }
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return;
+            }
+
+            Player target = Groups.player.find(p -> p.uuid().equals(uuid));
+            if (target == null) {
+                Log.info("Couldn't find that player.");
+                return;
+            }
+
+            target.name(newName);
+            player.sendMessage("Username updated.");
+        });
     }
 
 
@@ -651,6 +707,77 @@ public class Main extends Plugin {
                 Log.err("An error occurred when trying to process your request.");
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
             }
+        });
+
+        handler.register("shadow-ban", "<uuid> <duration> <reason...>", "Shadow bans a player.", args -> {
+            String uuid = args[0];
+            int duration = parseInt(args[1]);
+            String reason = args[2];
+
+            long durationMillis = duration * (24 * 60 * 60) * 1000;
+            long currentTime = System.currentTimeMillis();
+            long endTime = currentTime + durationMillis;
+
+            try {
+                database.addShadowBan(uuid, reason, String.valueOf(endTime));
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
+            }
+
+            Log.info("Successfully shadow banned @ for @ days.", uuid, duration);
+        });
+
+        handler.register("lookup-shadow-ban", "<uuid>", "Looks up a shadow ban's id.", args -> {
+            String uuid = args[0];
+            String id;
+
+            try {
+                id = database.lookupShadowBanId(uuid);
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
+            }
+
+            if (id == null) {
+                Log.info("Couldn't find a shadow ban related to UUID @.", uuid);
+                return;
+            }
+            Log.info("Shadow ban ID: @", id);
+        });
+
+        handler.register("remove-shadow-ban", "<id>", "Removes a shadow ban.", args -> {
+            String id = args[0];
+
+            try {
+                if (id.endsWith("==")) { // likely a player uuid
+                    database.removeShadowBan(id);
+                } else {
+                    database.removeShadowBanFromID(id);
+                }
+            } catch (SQLException e) {
+                Log.err("An error occurred when trying to process your request.");
+                Log.err(e.getClass().getName() + ": " + e.getMessage());
+                return;
+            }
+
+            Log.info("Removed shadow ban @.", id);
+        });
+
+        handler.register("change-username", "<uuid> <new-name...>", "Changes the username of a player.", args -> {
+            String uuid = args[0];
+            String newName = args[1];
+
+            Player player = Groups.player.find(p -> p.uuid().equals(uuid));
+            if (player == null) {
+                Log.info("Couldn't find that player.");
+                return;
+            }
+
+            player.name(newName);
+            Log.info("Username updated to @.", newName);
         });
     }
 }
