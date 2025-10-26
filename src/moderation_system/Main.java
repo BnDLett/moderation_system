@@ -552,6 +552,29 @@ public class Main extends Plugin {
                 displayInfo(player, info);
             }
         });
+
+        handler.<Player>register("change-username", "<uuid> <new-name...>", "Changes the username of a player.", (args, player) -> {
+            String uuid = args[0];
+            String newName = args[1];
+
+            try {
+                if (!checkPermission(true, player.uuid())) {
+                    player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
+                    return;
+                }
+            } catch (SQLException e) {
+                Log.err( e.getClass().getName() + ": " + e.getMessage() );
+                return;
+            }
+
+            Player target = Groups.player.find(p -> p.uuid().equals(uuid));
+            if (target == null) {
+                Log.info("Couldn't find that player.");
+                return;
+            }
+
+            target.name(newName);
+        });
     }
 
 
@@ -740,6 +763,19 @@ public class Main extends Plugin {
             }
 
             Log.info("Removed shadow ban @.", id);
+        });
+
+        handler.register("change-username", "<uuid> <new-name...>", "Changes the username of a player.", args -> {
+            String uuid = args[0];
+            String newName = args[1];
+
+            Player player = Groups.player.find(p -> p.uuid().equals(uuid));
+            if (player == null) {
+                Log.info("Couldn't find that player.");
+                return;
+            }
+
+            player.name(newName);
         });
     }
 }
