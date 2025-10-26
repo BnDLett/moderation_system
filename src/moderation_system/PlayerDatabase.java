@@ -40,7 +40,7 @@ public class PlayerDatabase {
 
         statement.executeUpdate("CREATE TABLE IF NOT EXISTS banned_players (" +
                 "uuid        TEXT               NOT NULL, " +
-                "ban_id      TEXT               NOT NULL, " +
+                "ban_id      TEXT               NOT NULL UNIQUE, " +
                 "ban_reason  TEXT               NOT NULL, " +
                 "ban_start   INT                NOT NULL, " +
                 "ban_end     INT                NOT NULL, " +
