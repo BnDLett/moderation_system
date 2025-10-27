@@ -5,11 +5,14 @@ import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.net.Administration;
 import java.sql.*;
+import java.util.LinkedList;
 import java.util.Random;
 
 public class PlayerDatabase {
     Connection databaseConnection;
     private final Random randomGenerator = new Random();
+    LinkedList<String> nonShadowBanned;
+    LinkedList<String> shadowBanned;
 
     public PlayerDatabase() throws SQLException {
         Connection connection;
@@ -26,6 +29,9 @@ public class PlayerDatabase {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             return;
         }
+
+        this.nonShadowBanned = new LinkedList<>();
+        this.shadowBanned = new LinkedList<>();
 
         this.databaseConnection = connection;
         Statement statement = connection.createStatement();
@@ -504,26 +510,42 @@ public class PlayerDatabase {
         return banEndTime;
     }
 
-    public boolean checkShadowBan(String UUID) throws SQLException {
+    public boolean checkShadowBan(String uuid) throws SQLException {
+        if (this.nonShadowBanned.contains(uuid)) {
+            return false;
+        } else if (this.shadowBanned.contains(uuid)) {
+            return true;
+        }
+
         long currentTime = System.currentTimeMillis();
-        long banEndTime = this.getShadowBanEnd(UUID);
+        long banEndTime = this.getShadowBanEnd(uuid);
         boolean banIsValid = currentTime <= banEndTime;
 
+        if (banEndTime == 0) {
+            this.nonShadowBanned.add(uuid);
+            return false;
+        }
+
         if (!banIsValid) {
-            this.removeShadowBan(UUID);
+            this.removeShadowBan(uuid);
+            this.shadowBanned.remove(uuid);
+        } else {
+            this.shadowBanned.add(uuid);
         }
 
         return banIsValid;
     }
 
-    public void addShadowBan(String UUID, String banReason, String endTime) throws SQLException {
+    public void addShadowBan(String uuid, String banReason, String endTime) throws SQLException {
+        this.nonShadowBanned.remove(uuid);
+
         long currentTime = System.currentTimeMillis();
         PreparedStatement statement = this.databaseConnection.prepareStatement(
                 "INSERT INTO shadow_ban (uuid, ban_reason, ban_start, ban_end) VALUES (?, ?, " +
                         "?, ?);"
         );
 
-        statement.setString(1, UUID);
+        statement.setString(1, uuid);
         statement.setString(2, banReason);
         statement.setLong(3, currentTime);
         statement.setLong(4, Long.parseLong(endTime));
@@ -532,6 +554,9 @@ public class PlayerDatabase {
     }
 
     public void removeShadowBanFromID(String id) throws SQLException {
+        String uuid = this.lookupShadowBanUuid(id);
+        this.shadowBanned.remove(uuid);
+
         PreparedStatement statement = this.databaseConnection.prepareStatement(
                 "DELETE FROM shadow_ban WHERE id==?;"
         );
@@ -541,6 +566,8 @@ public class PlayerDatabase {
     }
 
     public void removeShadowBan(String uuid) throws SQLException {
+        this.shadowBanned.remove(uuid);
+
         PreparedStatement statement = this.databaseConnection.prepareStatement(
                 "DELETE FROM shadow_ban WHERE uuid==?;"
         );
@@ -563,5 +590,21 @@ public class PlayerDatabase {
         }
 
         return id;
+    }
+
+    public String lookupShadowBanUuid(String id) throws SQLException {
+        PreparedStatement statement = this.databaseConnection.prepareStatement(
+                "SELECT * FROM shadow_ban WHERE id = ?;"
+        );
+        statement.setString(1, id);
+        ResultSet databaseResult = statement.executeQuery();
+
+        String uuid = null;
+
+        if (databaseResult.next()) {
+            uuid = databaseResult.getString("uuid");
+        }
+
+        return uuid;
     }
 }
