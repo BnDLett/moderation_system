@@ -528,7 +528,6 @@ public class PlayerDatabase {
 
         if (!banIsValid) {
             this.removeShadowBan(uuid);
-            this.shadowBanned.remove(uuid);
         } else {
             this.shadowBanned.add(uuid);
         }
@@ -568,10 +567,14 @@ public class PlayerDatabase {
     public void removeShadowBan(String uuid) throws SQLException {
         this.shadowBanned.remove(uuid);
 
+        // since SQLite will delete multiple rows at once, we'll lookup the ID and then use that instead of UUID.
+        // ID is unique, and the method will only return one ID. That way, we're not deleting rows en masse.
+        String banId = this.lookupShadowBanId(uuid);
+
         PreparedStatement statement = this.databaseConnection.prepareStatement(
-                "DELETE FROM shadow_ban WHERE uuid==?;"
+                "DELETE FROM shadow_ban WHERE id==?;"
         );
-        statement.setString(1, uuid);
+        statement.setString(1, banId);
         statement.executeUpdate();
         statement.close();
     }
