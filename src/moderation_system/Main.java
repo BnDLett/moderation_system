@@ -93,6 +93,22 @@ public class Main extends Plugin {
             setupDatabase();
         }
 
+        if (Administration.Config.debug.bool()) {
+            Log.debug("Debug enabled — running shadow ban benchmark.");
+
+            int iters = 100_000;
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < iters; i++) {
+                try {
+                    database.checkShadowBan("");
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            long endTime = System.currentTimeMillis();
+            Log.debug("@ ms for @ iterations.", endTime - startTime, iters);
+        }
+
         netServer.admins.addActionFilter(action -> {
             try {
                 if (database.checkShadowBan(action.player.uuid())) {
@@ -140,6 +156,15 @@ public class Main extends Plugin {
         });
 
         Events.on(EventType.PlayerLeave.class, event -> playerIdentifiers.remove(event.player.uuid()));
+
+        Events.on(EventType.PlayerLeave.class, event -> {
+            if (database.shadowBanned.contains(event.player.uuid())) {
+                database.shadowBanned.remove(event.player.uuid());
+                return;
+            }
+
+            database.nonShadowBanned.remove(event.player.uuid());
+        });
 
         Events.on(EventType.PlayerConnect.class, event -> {
             boolean banned;
@@ -726,6 +751,9 @@ public class Main extends Plugin {
                 return;
             }
 
+            Log.debug("Shadow banned: @", database.shadowBanned);
+            Log.debug("Not shadow banned: @", database.nonShadowBanned);
+
             Log.info("Successfully shadow banned @ for @ days.", uuid, duration);
         });
 
@@ -762,6 +790,9 @@ public class Main extends Plugin {
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
                 return;
             }
+
+            Log.debug("Shadow banned: @", database.shadowBanned);
+            Log.debug("Not shadow banned: @", database.nonShadowBanned);
 
             Log.info("Removed shadow ban @.", id);
         });
