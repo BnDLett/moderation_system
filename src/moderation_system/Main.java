@@ -541,7 +541,7 @@ public class Main extends Plugin {
                 return;
             }
 
-            String lastAccessed = targetTile.build.lastAccessed();
+            String lastAccessed = targetTile.build.lastAccessed;
             String coordinates = String.format("(%d, %d)", targetTile.x, targetTile.y);
             String toSend = String.format("Last accessed by: %s[white]\nBlock coordinates: %s", lastAccessed, coordinates);
             player.sendMessage(toSend);
