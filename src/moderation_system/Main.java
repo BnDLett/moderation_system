@@ -33,6 +33,7 @@ public class Main extends Plugin {
     private PlayerDatabase database;
     public static Administration.Config databaseLocation;
     public static Administration.Config reportFormURL;
+    private PunishmentWebhook punishmentWebhook;
 
     /**
      * @param adminLevel whether to only allow up to admin level.
@@ -78,9 +79,11 @@ public class Main extends Plugin {
     public void init(){
         databaseLocation = new Administration.Config("db-location",
                 "The location of the MDN Moderation database.", "");
-
         reportFormURL = new Administration.Config("report-form-url", "The URL for the report form.",
                 "");
+        punishmentWebhook = new PunishmentWebhook();
+
+        punishmentWebhook.sendPunishment("lorem", "ipsum");
 
         if (databaseLocation.string().isEmpty()) {
             databaseNotConfiguredWarning();
@@ -264,6 +267,7 @@ public class Main extends Plugin {
             }
 
             playerToKick.kick(banMessage, 0);
+            punishmentWebhook.sendPunishment("Ban", reason);
         } catch (SQLException e) {
             player.sendMessage(pluginMessageName + "[scarlet]There was an error in processing your request.");
         }
@@ -337,6 +341,8 @@ public class Main extends Plugin {
             playerToWarn.sendMessage(pluginMessageName + "[scarlet]WARNING[gray]:[white] " + reason);
             // I feel like the orange color will make it ominous and, therefore, hilarious.
             player.sendMessage(pluginMessageName + "The specified player has been [orange]warned[].");
+            punishmentWebhook.sendPunishment("Warn", reason);
+            Log.info("lorem ipsum");
         });
 
         handler.<Player>register("info", "<username...>", "Get the info of a player.", (args, player) -> {
