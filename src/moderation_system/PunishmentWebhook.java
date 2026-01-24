@@ -49,9 +49,7 @@ public class PunishmentWebhook {
                 reason
         ));
 
-        additionalInformation.forEach((k, v) -> {
-            authorString.append(String.format("\n### %s\n%s", k, v));
-        });
+        additionalInformation.forEach((k, v) -> authorString.append(String.format("\n### %s\n%s", k, v)));
 
         Embed authorEmbed = new Embed()
                 .setTitle(String.format("Punishment: %s", name))
