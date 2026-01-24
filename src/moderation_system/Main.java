@@ -394,6 +394,10 @@ public class Main extends Plugin {
             long endTime = currentTime + durationMillis;
 
             String playerUUID = getKeyByValue(playerIdentifiers, id);
+            if (playerUUID == null) {
+                player.sendMessage("Invalid id.");
+                return;
+            }
             Administration.PlayerInfo playerToBan = netServer.admins.getInfo(playerUUID);
 
             if (playerToBan == null) {
