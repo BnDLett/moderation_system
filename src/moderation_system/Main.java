@@ -635,7 +635,12 @@ public class Main extends Plugin {
                 database.addStaff(UUID, admin, discordID);
                 if (admin) {
                     Player player = Groups.player.find(p -> p.uuid().equals(UUID));
-                    player.admin(true);
+                    if (player == null) {
+                        Log.warn("Not setting @ as admin. Player is offline.", UUID);
+                        return;
+                    } else {
+                        player.admin(true);
+                    }
                 }
             } catch (SQLException e) {
                 Log.err("An error occurred when trying to process your request.");
