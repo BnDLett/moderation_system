@@ -33,6 +33,7 @@ public class Main extends Plugin {
     private PlayerDatabase database;
     public static Administration.Config databaseLocation;
     public static Administration.Config reportFormURL;
+    private PunishmentWebhook punishmentWebhook;
 
     /**
      * @param adminLevel whether to only allow up to admin level.
@@ -78,9 +79,9 @@ public class Main extends Plugin {
     public void init(){
         databaseLocation = new Administration.Config("db-location",
                 "The location of the MDN Moderation database.", "");
-
         reportFormURL = new Administration.Config("report-form-url", "The URL for the report form.",
                 "");
+        punishmentWebhook = new PunishmentWebhook();
 
         if (databaseLocation.string().isEmpty()) {
             databaseNotConfiguredWarning();
@@ -224,7 +225,7 @@ public class Main extends Plugin {
         });
     }
 
-    private void banCommand(Player player, String reason, Long endTime, Administration.PlayerInfo playerToBan) {
+    private void banCommand(Player player, String reason, Long endTime, Administration.PlayerInfo playerToBan, String rawDuration) {
         try {
             if (!checkPermission(true, player.uuid())) {
                 player.sendMessage(pluginMessageName + "You do not have permission to run this command.");
@@ -255,6 +256,12 @@ public class Main extends Plugin {
 
             player.sendMessage(String.format("%s The player has been banned. Ban ID: [gold]%s[]", pluginMessageName,
                     banID));
+
+            Map<String, String> additionalInformation = Map.of(
+                    "Duration", rawDuration,
+                    "Ban ID", banID
+            );
+            punishmentWebhook.sendPunishment("Ban", reason, additionalInformation, player, playerToBan, Color.RED);
 
             Player playerToKick = Groups.player.find(p -> p.uuid().equals(playerToBan.id));
 
@@ -310,6 +317,7 @@ public class Main extends Plugin {
 
             playerToKick.kick(reason);
             player.sendMessage(pluginMessageName + "The player has been [scarlet]kicked[].");
+            punishmentWebhook.sendPunishment("Kick", reason, player, playerToKick, Color.ORANGE);
         });
 
         handler.<Player>register("warn", "<id> <reason...>", "Warn a player.", (args, player) -> {
@@ -337,6 +345,7 @@ public class Main extends Plugin {
             playerToWarn.sendMessage(pluginMessageName + "[scarlet]WARNING[gray]:[white] " + reason);
             // I feel like the orange color will make it ominous and, therefore, hilarious.
             player.sendMessage(pluginMessageName + "The specified player has been [orange]warned[].");
+            punishmentWebhook.sendPunishment("Warn", reason, player, playerToWarn, Color.YELLOW);
         });
 
         handler.<Player>register("info", "<username...>", "Get the info of a player.", (args, player) -> {
@@ -388,6 +397,10 @@ public class Main extends Plugin {
             long endTime = currentTime + durationMillis;
 
             String playerUUID = getKeyByValue(playerIdentifiers, id);
+            if (playerUUID == null) {
+                player.sendMessage("Invalid id.");
+                return;
+            }
             Administration.PlayerInfo playerToBan = netServer.admins.getInfo(playerUUID);
 
             if (playerToBan == null) {
@@ -395,7 +408,7 @@ public class Main extends Plugin {
                 return;
             }
 
-            banCommand(player, reason, endTime, playerToBan);
+            banCommand(player, reason, endTime, playerToBan, String.valueOf(duration));
         });
 
         handler.<Player>register("ban-by-uuid", "<uuid> <days> <reason...>", "Bans a player with " +
@@ -411,9 +424,11 @@ public class Main extends Plugin {
             long currentTime = System.currentTimeMillis();
             long endTime = currentTime + durationMillis;
 
+            Log.info("lorem");
             Administration.PlayerInfo playerToBan = netServer.admins.getInfo(playerUUID);
+            Log.info("ipsum");
 
-            banCommand(player, reason, endTime, playerToBan);
+            banCommand(player, reason, endTime, playerToBan, String.valueOf(duration));
         });
 
         handler.<Player>register("unban", "<id>", "Unbans a player.", (args, player) -> {
@@ -433,6 +448,10 @@ public class Main extends Plugin {
                 String playerToUnban = database.getUUIDFromBanID(id);
                 database.removeBan(playerToUnban);
                 player.sendMessage(pluginMessageName + "Player was successfully unbanned.");
+
+                Administration.PlayerInfo info = netServer.admins.getInfoOptional(playerToUnban);
+                if (info == null) {Log.warn("Couldn't retrieve player info for unban."); return;}
+                punishmentWebhook.sendPunishment("Unban", "", player, info, Color.YELLOW);
             } catch (SQLException e) {
                 player.sendMessage(pluginMessageName + "An error occurred when trying to process your request.");
                 Log.err(e.getClass().getName() + ": " + e.getMessage());
@@ -616,7 +635,12 @@ public class Main extends Plugin {
                 database.addStaff(UUID, admin, discordID);
                 if (admin) {
                     Player player = Groups.player.find(p -> p.uuid().equals(UUID));
-                    player.admin(true);
+                    if (player == null) {
+                        Log.warn("Not setting @ as admin. Player is offline.", UUID);
+                        return;
+                    } else {
+                        player.admin(true);
+                    }
                 }
             } catch (SQLException e) {
                 Log.err("An error occurred when trying to process your request.");

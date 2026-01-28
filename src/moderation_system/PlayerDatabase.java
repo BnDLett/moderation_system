@@ -521,6 +521,7 @@ public class PlayerDatabase {
         long banEndTime = this.getShadowBanEnd(uuid);
         boolean banIsValid = currentTime <= banEndTime;
 
+        // not banned
         if (banEndTime == 0) {
             this.nonShadowBanned.add(uuid);
             return false;
